@@ -7,6 +7,7 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain_community.vectorstores import FAISS
 from supabase import create_client
 import os
+from flask import Flask, request, jsonify
 
 # Load Supabase credentials
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -78,15 +79,33 @@ def process_user_message(chat_id, user_message, chat_history):
     # Return the chatbot response and the updated chat history
     return bot_response, chat_history
 
-# Main logic to process user messages
-if __name__ == "__main__":
-    # Example of starting a new chat and processing a user message
+# Initialize Flask app
+app = Flask(__name__)
+
+# Route for starting a new chat
+@app.route('/start_chat', methods=['GET'])
+def start_chat():
     chat_id = start_new_chat()
-    chat_history = []  # Initialize an empty chat history
+    return jsonify({"chat_id": chat_id}), 200
 
-    # Example user message
-    user_message = "What is machine learning?"
-    bot_response, chat_history = process_user_message(chat_id, user_message, chat_history)
+# Route to process user messages
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    chat_id = data.get("chat_id")
+    user_message = data.get("user_message")
+    
+    if not chat_id or not user_message:
+        return jsonify({"error": "chat_id and user_message are required"}), 400
 
-    print(f"Bot Response: {bot_response}")
-    print(f"Updated Chat History: {chat_history}")
+    chat_history = []  # You could retrieve chat history from the database if needed
+    bot_response, updated_chat_history = process_user_message(chat_id, user_message, chat_history)
+
+    return jsonify({
+        "bot_response": bot_response,
+        "chat_history": updated_chat_history
+    }), 200
+
+# Main entry point to run the Flask app
+if __name__ == "__main__":
+    app.run(debug=True)
