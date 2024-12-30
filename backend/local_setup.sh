@@ -12,11 +12,11 @@ then
     echo ".env folder exists. Installing using pip"
 else
     echo "creating .env and install using pip"
-    python -m venv .env
+    python3 -m venv .venv
 fi
 
 # Activate virtual env
-. .env/bin/activate
+. .venv/bin/activate
 
 # Upgrade the PIP
 #echo "Upgrading PIP..."

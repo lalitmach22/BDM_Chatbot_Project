@@ -20,4 +20,5 @@ Thumbs.db
 #documents
 /backend/hidden_docs/
 /backend/.env/
+/backend/.venv/
 

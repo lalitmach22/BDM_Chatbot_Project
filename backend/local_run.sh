@@ -7,7 +7,7 @@ echo "----------------------------------------------------------------------"
 # Measure the time before installing Python libraries
 start_time=$(date +%s)
 
-if [ -d ".env" ];
+if [ -d ".venv" ];
 then
     echo "Enabling virtual env"
 else
@@ -16,7 +16,7 @@ else
 fi
 
 # Activate virtual env
-. .env/bin/activate
+. .venv/bin/activate
 export ENV=development
 end_time=$(date +%s)
 
@@ -24,6 +24,6 @@ end_time=$(date +%s)
 elapsed_time=$((end_time - start_time))
 echo "Virtual Environment activated in $elapsed_time seconds."
 
-python3 main.py
+python3 run.py
 deactivate
 

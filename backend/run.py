@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
-from data import store_chat_history, store_embeddings, retrieve_relevant_texts
-from vector_store import reload_vector_store_if_needed
+from app.data import store_chat_history, store_embeddings, retrieve_relevant_texts
+from app.vector_store import reload_vector_store_if_needed
 from langchain_groq import ChatGroq
 from langchain.chains import ConversationalRetrievalChain
 from langchain_community.vectorstores import FAISS
