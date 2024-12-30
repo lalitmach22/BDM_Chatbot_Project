@@ -13,6 +13,12 @@ from supabase import create_client
 from flask import Flask, request, jsonify
 import os
 from dotenv import load_dotenv
+import threading
+import logging
+
+# Set up logging for debugging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -20,6 +26,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
+    logger.error("Supabase URL and key are not set in the environment variables.")
     raise ValueError("Supabase URL and key are not set in the environment variables.")
 
 # Initialize Supabase client
@@ -35,30 +42,57 @@ SYSTEM_PROMPT = """You are an intelligent and helpful assistant specializing in 
 6. Use a professional and approachable tone suitable for business and academic environments.
 Always ensure that your answers are actionable, focused, and aligned with best practices in business analysis and decision modeling."""
 
-# Load the model
+# Global variable to cache the model
+model = None
+model_lock = threading.Lock()  # Lock to ensure thread-safe model loading
+
+# Load the model (cached if already loaded)
 def load_model():
-    return ChatGroq(
-        temperature=0.8, 
-        model="llama3-8b-8192",
-        system_prompt=SYSTEM_PROMPT
-    )
+    global model
+    if model is None:
+        try:
+            with model_lock:  # Ensure that only one thread loads the model
+                if model is None:  # Double-checked locking to ensure only one thread loads
+                    model = ChatGroq(
+                        temperature=0.8, 
+                        model="llama3-8b-8192",
+                        system_prompt=SYSTEM_PROMPT
+                    )
+                    logger.info("Model loaded successfully.")
+        except Exception as e:
+            logger.error(f"Error loading model: {e}")
+            raise e
+    return model
 
-model = load_model()
-vector_store = reload_vector_store_if_needed()
-retrieval_chain = ConversationalRetrievalChain.from_llm(model, retriever=vector_store.as_retriever())
+# Initialize model and vector store
+try:
+    model = load_model()
+    vector_store = reload_vector_store_if_needed()
+    retrieval_chain = ConversationalRetrievalChain.from_llm(model, retriever=vector_store.as_retriever())
+    logger.info("Vector store and retrieval chain initialized.")
+except Exception as e:
+    logger.error(f"Error initializing model or vector store: {e}")
+    raise e
 
+# Function to generate chatbot response
 def generate_chatbot_response(user_message, chat_history):
-    response = retrieval_chain.invoke({
-        "question": user_message,
-        "chat_history": chat_history
-    })
-    return response["answer"]
+    try:
+        response = retrieval_chain.invoke({
+            "question": user_message,
+            "chat_history": chat_history
+        })
+        return response["answer"]
+    except Exception as e:
+        logger.error(f"Error generating chatbot response: {e}")
+        return "Sorry, I encountered an error while processing your request."
 
+# Function to start a new chat
 def start_new_chat():
     chat_id = str(uuid.uuid4())
-    print(f"New chat session started with ID: {chat_id}")
+    logger.info(f"New chat session started with ID: {chat_id}")
     return chat_id
 
+# Function to process user message and update chat history
 def process_user_message(chat_id, user_message, chat_history):
     bot_response = generate_chatbot_response(user_message, chat_history)
 
@@ -69,17 +103,27 @@ def process_user_message(chat_id, user_message, chat_history):
         "bot_response": bot_response
     })
 
-    store_chat_history(chat_id, chat_history)
+    # Limit chat history size to the most recent 50 messages
+    chat_history = chat_history[-50:]
+
+    try:
+        store_chat_history(chat_id, chat_history)
+        logger.info(f"Chat history updated for chat_id: {chat_id}")
+    except Exception as e:
+        logger.error(f"Error storing chat history for chat_id {chat_id}: {e}")
+
     return bot_response, chat_history
 
 # Flask app initialization
 app = Flask(__name__)
 
+# Start new chat route
 @app.route('/start_chat', methods=['GET'])
 def start_chat():
     chat_id = start_new_chat()
     return jsonify({"chat_id": chat_id}), 200
 
+# Chat route
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
@@ -87,16 +131,24 @@ def chat():
     user_message = data.get("user_message")
     
     if not chat_id or not user_message:
+        logger.warning("chat_id or user_message is missing in request.")
         return jsonify({"error": "chat_id and user_message are required"}), 400
 
-    # Retrieve existing chat history
-    chat_history = retrieve_chat_history(chat_id) or []
+    try:
+        # Retrieve existing chat history, ensuring the session exists
+        chat_history = retrieve_chat_history(chat_id) or []
+        if not chat_history:
+            logger.warning(f"No chat history found for chat_id: {chat_id}. Starting a new session.")
+        
+        bot_response, updated_chat_history = process_user_message(chat_id, user_message, chat_history)
+        return jsonify({
+            "bot_response": bot_response,
+            "chat_history": updated_chat_history
+        }), 200
+    except Exception as e:
+        logger.error(f"Error in chat route: {e}")
+        return jsonify({"error": "An error occurred while processing your request."}), 500
 
-    bot_response, updated_chat_history = process_user_message(chat_id, user_message, chat_history)
-    return jsonify({
-        "bot_response": bot_response,
-        "chat_history": updated_chat_history
-    }), 200
-
+# Main entry point
 if __name__ == "__main__":
     app.run(debug=True)
