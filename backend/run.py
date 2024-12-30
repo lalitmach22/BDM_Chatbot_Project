@@ -7,7 +7,8 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain_community.vectorstores import FAISS
 from supabase import create_client
 import os
-from flask import Flask, request, jsonify
+import Flask
+from Flask import request, jsonify
 
 # Load Supabase credentials
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -21,8 +22,22 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Load the model and retrieval chain
+prompt = """You are an intelligent and helpful assistant specializing in providing detailed, accurate, and practical answers for queries related to the BDM project. Your role is to:
+    1. Guide users for the BDM project like formats of proposal, mide term report and final report. Page , font, line spacing settings
+    2. Guide users in solving problems related to supply chain management, financial analysis, operational efficiency, and data-driven decision-making.
+    3. Provide concise yet comprehensive explanations, including relevant examples, where necessary.
+    4. If a user’s query is unclear, politely ask for clarification.
+    5. If the question is outside your expertise or related to specific project data you don't have, inform the user and suggest alternative approaches or resources.
+    6. Use a professional and approachable tone suitable for business and academic environments.
+    Always ensure that your answers are actionable, focused, and aligned with best practices in business analysis and decision modeling."""
+
+
 def load_model():
-    return ChatGroq(temperature=0.8, model="llama3-8b-8192")
+    return ChatGroq(
+        temperature=0.8, 
+        model="llama3-8b-8192",
+        system_prompt=prompt
+    )
 
 # Initialize model, vector store, and retrieval chain
 model = load_model()
