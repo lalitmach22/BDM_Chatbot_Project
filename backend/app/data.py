@@ -14,10 +14,17 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def store_embeddings(embedding_data):
     """
-    Store embeddings in Supabase.
+    Store embeddings in Supabase with a check for duplicates.
     :param embedding_data: List of dictionaries with text and embeddings
     """
     try:
+        # Check if embeddings already exist (assuming embeddings are unique based on some property)
+        for item in embedding_data:
+            existing = supabase.table("embeddings").select("id").eq("text", item["text"]).execute()
+            if existing.data:
+                print(f"Embedding for text '{item['text']}' already exists, skipping.")
+                continue
+        
         response = supabase.table("embeddings").insert(embedding_data).execute()
         if response.error:
             print(f"Error storing embeddings: {response.error}")
@@ -25,6 +32,7 @@ def store_embeddings(embedding_data):
             print("Embeddings stored successfully.")
     except Exception as e:
         print(f"Error interacting with Supabase: {e}")
+
 
 def retrieve_relevant_texts(query_embedding, top_k=5):
     """
