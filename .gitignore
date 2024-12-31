@@ -21,4 +21,5 @@ Thumbs.db
 /backend/hidden_docs/
 /backend/.env/
 /backend/.venv/
+/backend/app/.env
 
