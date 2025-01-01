@@ -7,6 +7,7 @@ Flask
 Flask-Cors
 python-dotenv
 langchain
+langchain-huggingface
 langchain-community
 langchain-groq
 torch

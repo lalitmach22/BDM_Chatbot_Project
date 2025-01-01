@@ -4,7 +4,7 @@ import pickle
 from hashlib import md5
 from app.file_utils import load_hidden_documents
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 # Global variables
 VECTOR_STORE = None
