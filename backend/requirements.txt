@@ -13,10 +13,11 @@ langchain-groq
 torch
 torchtext
 faiss-cpu
-pypdf2
+pypdf
 supabase
 scikit-learn
 huggingface-hub
+
 
 
 
