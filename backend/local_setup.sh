@@ -18,7 +18,7 @@ fi
 # Activate virtual env
 echo "Activating virtual environment"
 . .venv/bin/activate
-
+export ENV=development
 # Upgrade the PIP (if you uncomment this)
 #echo "Upgrading PIP..."
 #pip install --upgrade pip

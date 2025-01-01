@@ -107,7 +107,7 @@ def process_user_message(chat_id, user_message, chat_history):
     chat_history = chat_history[-50:]
 
     try:
-        store_chat_history(chat_id, chat_history)
+        store_chat_history(supabase,chat_id, chat_history)
         logger.info(f"Chat history updated for chat_id: {chat_id}")
     except Exception as e:
         logger.error(f"Error storing chat history for chat_id {chat_id}: {e}")
@@ -116,6 +116,14 @@ def process_user_message(chat_id, user_message, chat_history):
 
 # Flask app initialization
 app = Flask(__name__)
+
+
+@app.route('/', methods=['GET'])
+def home():
+    """
+    Home route for the BDM Chatbox
+    """
+    return jsonify({"message": "Welcome to the BDM Chatbox"}), 200
 
 # Start new chat route
 @app.route('/start_chat', methods=['GET'])
@@ -136,7 +144,7 @@ def chat():
 
     try:
         # Retrieve existing chat history, ensuring the session exists
-        chat_history = retrieve_chat_history(chat_id) or []
+        chat_history = retrieve_chat_history(supabase,chat_id) or []
         if not chat_history:
             logger.warning(f"No chat history found for chat_id: {chat_id}. Starting a new session.")
         

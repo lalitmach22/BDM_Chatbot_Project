@@ -1,22 +1,6 @@
-from supabase import create_client
-from dotenv import load_dotenv
 import os
 
-load_dotenv(dotenv_path=r"d:\BDM_Chatbot_Project\backend\.env")
-
-
-# Load Supabase credentials
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-# Check if the environment variables are set
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("Supabase URL and key are not set in the environment variables.")
-
-# Initialize Supabase client
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-def store_embeddings(embedding_data):
+def store_embeddings(supabase, embedding_data):
     """
     Store embeddings in Supabase with a check for duplicates.
     :param embedding_data: List of dictionaries with text and embeddings
@@ -38,7 +22,7 @@ def store_embeddings(embedding_data):
         print(f"Error interacting with Supabase: {e}")
 
 
-def retrieve_relevant_texts(query_embedding, top_k=5):
+def retrieve_relevant_texts(supabase, query_embedding, top_k=5):
     """
     Retrieve the most relevant texts based on a query embedding.
     :param query_embedding: Query embedding to compare
@@ -58,7 +42,7 @@ def retrieve_relevant_texts(query_embedding, top_k=5):
         print(f"Error interacting with Supabase: {e}")
         return []
 
-def store_chat_history(chat_id, chat_history):
+def store_chat_history(supabase, chat_id, chat_history):
     """
     Store chat history in Supabase.
     :param chat_id: Unique ID for the chat session
@@ -76,7 +60,7 @@ def store_chat_history(chat_id, chat_history):
     except Exception as e:
         print(f"Error interacting with Supabase: {e}")
 
-def retrieve_chat_history(chat_id):
+def retrieve_chat_history(supabase, chat_id):
     """
     Retrieve chat history from Supabase.
     :param chat_id: Unique ID for the chat session
