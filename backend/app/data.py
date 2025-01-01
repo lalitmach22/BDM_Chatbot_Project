@@ -2,7 +2,7 @@ from supabase import create_client
 from dotenv import load_dotenv
 import os
 
-load_dotenv(dotenv_path=r"C:\Users\Dell\Documents\GitHub\new\BDM_Chatbot_Project\backend\.env")
+load_dotenv(dotenv_path=r"d:\BDM_Chatbot_Project\backend\.env")
 
 
 # Load Supabase credentials
