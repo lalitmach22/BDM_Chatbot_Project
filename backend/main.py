@@ -6,7 +6,7 @@ from app.data import (
     retrieve_relevant_texts
 )
 from app.vector_store import reload_vector_store_if_needed
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from langchain.chains import ConversationalRetrievalChain
 from langchain_community.vectorstores import FAISS

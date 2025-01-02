@@ -10,7 +10,7 @@ langchain
 langchain-huggingface
 langchain-community
 langchain-groq
-langchain.prompts
+langchain_core
 torch
 torchtext
 faiss-cpu
@@ -18,13 +18,3 @@ pypdf
 supabase
 scikit-learn
 huggingface-hub
-
-
-
-
-
-
-
-
-
-
