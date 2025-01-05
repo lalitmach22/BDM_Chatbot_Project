@@ -89,5 +89,5 @@ def reload_vector_store_if_needed(directory="hidden_docs"):
                 return VECTOR_STORE
         else:
             print("No file changes detected. Using cached vector store.")
-    
+  
     return VECTOR_STORE
