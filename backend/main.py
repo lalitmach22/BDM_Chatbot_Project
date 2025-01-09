@@ -76,14 +76,26 @@ def ask_question():
         start_time = request.json.get('start_time', datetime.now().isoformat())
         
         logger.info(f"Received question: {user_input} from {email}")
+        
+        # Call the process_user_input function
         answer, tokens_count = process_user_input(supabase, retrieval_chain, email, name, user_input, chat_history, datetime.fromisoformat(start_time))
         
         logger.info(f"Question processed: {user_input}")
-        return jsonify({"status": "success", "answer": answer, "tokens_count": tokens_count})
+        
+        # Include chat_history in the response for debugging
+        return jsonify({
+            "status": "success", 
+            "answer": answer, 
+            "tokens_count": tokens_count,
+            "chat_history": chat_history  # Add chat_history here to check the chat history
+        })
     except Exception as e:
         logger.error(f"Error in ask_question: {e}")
-        return jsonify({"status": "error", "message": "An error occurred while processing the question."})
-
+        return jsonify({
+            "status": "error", 
+            "message": "An error occurred while processing the question."
+        })
+    
 @app.route('/get_token_count_from_input', methods=['POST'])
 def get_token_count_from_input():
     try:
