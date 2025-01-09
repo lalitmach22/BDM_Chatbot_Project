@@ -6,12 +6,10 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from langchain_groq import ChatGroq
 from app.vector_store import reload_vector_store_if_needed, embedder
-from app.chat import is_valid_email, process_user_input
+from app.chat import is_valid_email, process_user_input, redis_client, local_cache
 from langchain.chains import ConversationalRetrievalChain
-from app.extract_texts import logger,load_hidden_documents
+from app.extract_texts import logger, load_hidden_documents
 from app.embeddings import store_embeddings_in_supabase
-
-
 
 directory = "hidden_docs"
 # Load environment variables from .env file
@@ -65,21 +63,30 @@ def validate_email():
     except Exception as e:
         logger.error(f"Error in validate_email: {e}")
         return jsonify({"status": "error", "message": "An error occurred during email validation."})
-
 @app.route('/chat', methods=['POST'])
 def ask_question():
     try:
         email = request.json['email']  
         name = request.json.get('name', '')  # Default name as empty string if not provided
         user_input = request.json['question']
-        chat_history = request.json.get('chat_history', [])
         start_time = request.json.get('start_time', datetime.now().isoformat())
         
         logger.info(f"Received question: {user_input} from {email}")
         
+        # Retrieve chat history from local cache first, then fall back to Redis if not found
+        chat_history = local_cache.get(email)
+        if chat_history is None:
+            chat_history_key = f"chat_history:{email}"
+            chat_history_json = redis_client.get(chat_history_key)
+            chat_history = json.loads(chat_history_json) if chat_history_json else []
+
         # Call the process_user_input function
-        answer, tokens_count = process_user_input(supabase, retrieval_chain, email, name, user_input, chat_history, datetime.fromisoformat(start_time))
+        answer, tokens_count = process_user_input(supabase, retrieval_chain, email, name, user_input, vector_store, embedder, chat_history, datetime.fromisoformat(start_time))
         
+        # Save updated chat history to local cache and Redis
+        local_cache[email] = chat_history
+        redis_client.set(f"chat_history:{email}", json.dumps(chat_history))
+                
         logger.info(f"Question processed: {user_input}")
         
         # Include chat_history in the response for debugging

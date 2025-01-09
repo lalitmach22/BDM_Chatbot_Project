@@ -1,11 +1,18 @@
 import os, re
+import json
 import numpy as np
 from datetime import datetime, timedelta
 import pytz
+import redis
 #from sklearn.metrics.pairwise import cosine_similarity
 from .extract_texts import logger
 from .tokens import count_tokens
 
+# Initialize Redis client
+redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
+
+# Local cache for chat history
+local_cache = {}
 # Email validation regex
 email_regex = re.compile(r"^\d{2}f\d{7}@ds\.study\.iitm\.ac\.in$")
 
@@ -61,7 +68,6 @@ def find_similar_question_faiss(user_input, vector_store, embedder, chat_history
         logger.error(f"Exception occurred while finding similar question: {e}")
 
     return None, None
-
 def process_user_input(supabase, retrieval_chain, email, name, user_input, vector_store, embedder, chat_history=None, start_time=None):
     """Process the user's input and return the chatbot's response."""
     logger.info(f"Processing user input: {user_input}")
@@ -104,10 +110,11 @@ def process_user_input(supabase, retrieval_chain, email, name, user_input, vecto
             # Return the answer and token count even when session ends, to maintain consistency
             return "Session data successfully saved to Supabase. Please refresh to start a new session", tokens_count
 
+        # Save updated chat history to local cache and Redis
+        chat_history_key = f"chat_history:{email}"
+        local_cache[email] = chat_history        
+        redis_client.setex(chat_history_key, timedelta(days=7), json.dumps(chat_history))  # Set expiration of 7 days
         return answer, tokens_count
     except Exception as e:
         logger.error(f"Exception occurred while processing user input: {e}")
         return "An error occurred while processing your input. Please try again.", 0
-
-
-
