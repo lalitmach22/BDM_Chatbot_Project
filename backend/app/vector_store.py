@@ -1,93 +1,129 @@
 import os
-import time
-import pickle
-from hashlib import md5
-from app.file_utils import load_hidden_documents
+from .extract_texts import logger
+from threading import Lock
+from .documents import store_file_hashes_in_supabase
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
+from .extract_texts import load_hidden_documents
+from .embeddings import store_embeddings_in_supabase, load_embeddings_from_supabase
 
-# Global variables
-VECTOR_STORE = None
-FILE_HASHES = {}  # Store file hashes and modification times to track changes
-LAST_RELOAD_TIME = 0  # To track the last reload time
-RELOAD_INTERVAL = 120  # Reload interval in seconds (e.g., 2 minutes)
-CACHE_PATH = "vector_store_cache.pkl"  # Path for caching the vector store
 
-def get_file_hash(file_path):
-    """Generate MD5 hash of the file content."""
-    hash_md5 = md5()
-    with open(file_path, 'rb') as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
+VECTOR_STORE_PATH = "faiss_index"
+embedder = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+# In-memory storage for vector store and file modification times
+in_memory_store = {
+    "vector_store": None,
+    "file_mod_times": None
+}
 
-def get_file_mod_time(file_path):
-    """Get the modification time of a specific file."""
-    return os.path.getmtime(file_path)
+# Thread lock for thread safety
+store_lock = Lock()
 
 def create_vector_store(document_texts):
-    """Create vector store from document texts."""
-    embedder = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    return FAISS.from_texts(document_texts, embedder)
+    """Create a FAISS vector store from the provided document texts."""
+    vector_store = FAISS.from_texts(document_texts, embedder)
+    logger.info("Vector store created successfully.")
+    return vector_store
 
-def is_cache_valid():
-    """Check if the cache file exists and is up to date."""
-    if not os.path.exists(CACHE_PATH):
-        return False
-    cache_mod_time = os.path.getmtime(CACHE_PATH)
-    current_time = time.time()
-    if current_time - cache_mod_time < RELOAD_INTERVAL:
-        return True
-    return False
-
-def load_vector_store_from_cache():
-    """Load the vector store from the cache file."""
-    with open(CACHE_PATH, 'rb') as cache_file:
-        return pickle.load(cache_file)
-
-def save_vector_store_to_cache(vector_store):
-    """Save the vector store to the cache file."""
-    with open(CACHE_PATH, 'wb') as cache_file:
-        pickle.dump(vector_store, cache_file)
-
-def reload_vector_store_if_needed(directory="hidden_docs"):
-    """Reload the vector store if any files have changed or the cache is outdated."""
-    global VECTOR_STORE, FILE_HASHES, LAST_RELOAD_TIME
-    current_time = time.time()
-
-    if current_time - LAST_RELOAD_TIME < RELOAD_INTERVAL:
-        return VECTOR_STORE
-
-    if is_cache_valid():
-        VECTOR_STORE = load_vector_store_from_cache()
-        print("Loaded vector store from cache.")
+'''def get_file_mod_times(directory):
+    """Get the modification times of all files in the directory."""
+    return {
+        f: os.path.getmtime(os.path.join(directory, f))
+        for f in os.listdir(directory)
+        if os.path.isfile(os.path.join(directory, f))  # Ensure it's a file, not a directory
+    }'''
+'''def load_or_build_vector_store(directory,supabase_client, embedder):
+    """Load the existing vector store if available; otherwise, build it from scratch."""
+    if os.path.exists(VECTOR_STORE_PATH):
+        logger.info("Loading existing vector store...")
+        return FAISS.load_local(VECTOR_STORE_PATH, embedder, allow_dangerous_deserialization=True)
     else:
-        current_file_data = {}
-        for filename in os.listdir(directory):
-            file_path = os.path.join(directory, filename)
-            if os.path.isfile(file_path):
-                current_file_data[filename] = {
-                    "hash": get_file_hash(file_path),
-                    "mod_time": get_file_mod_time(file_path)
-                }
+        logger.info("Building new vector store...")
+        document_texts = load_hidden_documents(directory)
+        if not document_texts:
+            logger.warning("No documents found in the directory. Vector store not created.")
+            return None
+        logger.info(f"Document texts extracted for vector store are of length {len(document_texts)}")
+        
+        vector_store = create_vector_store(document_texts)
+        vector_store.save_local(VECTOR_STORE_PATH)
+        return vector_store'''
 
-        files_to_reload = []
-        for filename, file_data in current_file_data.items():
-            if filename not in FILE_HASHES or FILE_HASHES[filename] != file_data:
-                files_to_reload.append(filename)
 
-        if files_to_reload:
-            print(f"Reloading files: {files_to_reload}")
-            try:
-                document_texts = load_hidden_documents(directory)
-                VECTOR_STORE = create_vector_store(document_texts)
-                FILE_HASHES = current_file_data
-                save_vector_store_to_cache(VECTOR_STORE)
-                LAST_RELOAD_TIME = current_time
-            except Exception as e:
-                print(f"Error while reloading vector store: {e}")
-                return VECTOR_STORE
+'''
+def reload_vector_store_if_needed(directory, supabase_client):
+    """Reload the vector store if any files in the directory have been modified."""
+    with store_lock:  # Ensure thread safety
+        current_mod_times = get_file_mod_times(directory)
+
+        if in_memory_store["file_mod_times"] != current_mod_times:
+            in_memory_store["file_mod_times"] = current_mod_times
+            vector_store = load_or_build_vector_store(directory, supabase_client, embedder)
+            in_memory_store["vector_store"] = vector_store
+            logger.info("Vector store reloaded and stored in memory.")
         else:
-            print("No file changes detected. Using cached vector store.")
-  
-    return VECTOR_STORE
+            vector_store = in_memory_store.get("vector_store", None)
+            if vector_store:
+                logger.info("Vector store loaded from memory.")
+            else:
+                logger.error("Vector store not found in memory.")
+
+    return vector_store'''
+
+def load_or_build_vector_store(directory, supabase_client):
+    """Load the existing vector store if available, otherwise build a new one."""
+    new_or_modified_files = store_file_hashes_in_supabase(directory, supabase_client)
+    logger.info(f"Found {len(new_or_modified_files)} new or modified files.")
+
+    # Check if there's an existing vector store
+    if os.path.exists(VECTOR_STORE_PATH):
+        logger.info("Loading existing vector store...")
+        vector_store = FAISS.load_local(VECTOR_STORE_PATH, embedder, allow_dangerous_deserialization=True)
+    else:
+        vector_store = None
+
+    if not new_or_modified_files:
+        if vector_store:
+            logger.info("No new or modified files. Using existing vector store.")
+            return vector_store
+        else:
+            logger.warning("No vector store found and no new documents to process.")
+            return None
+
+    # Load texts from new or modified files
+    document_texts = load_hidden_documents(directory, files=new_or_modified_files)
+    if not document_texts:
+        logger.warning("No documents found in the directory. Vector store not created.")
+        return vector_store
+
+    # If vector store doesn't exist, create it from the new document texts
+    if vector_store is None:
+        vector_store = create_vector_store(document_texts)
+    else:
+        # Create a new vector store for the new documents
+        new_vector_store = FAISS.from_texts(document_texts, embedder)
+
+        # Merge the new vector store with the existing one
+        vector_store.merge_from(new_vector_store)
+        logger.info("Appended new embeddings to existing vector store.")
+
+    # Save the updated vector store
+    vector_store.save_local(VECTOR_STORE_PATH)
+    logger.info("Updated vector store saved.")
+    return vector_store
+
+
+def reload_vector_store_if_needed(directory, supabase_client):
+    """Reload the vector store if any files in the directory have changed."""
+    with store_lock:  # Ensure thread safety
+        vector_store = load_or_build_vector_store(directory, supabase_client)
+        if not vector_store:
+            if in_memory_store.get("vector_store") is None:
+                logger.error("Failed to load or build vector store. No vector store available.")
+                return None
+            logger.info("Using existing in-memory vector store.")
+        else:
+            in_memory_store["vector_store"] = vector_store
+            logger.info("Vector store reloaded and stored in memory.")
+    
+    return in_memory_store.get("vector_store", None)
