@@ -1,24 +1,27 @@
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from langchain_groq import ChatGroq
+from app.extract_texts import logger
 from app.vector_store import reload_vector_store_if_needed, embedder
-from app.chat import is_valid_email, process_user_input, redis_client, local_cache
+from app.chat import is_valid_email, process_user_input
+from app.chat import load_chat_history_from_local
+from app.chat import get_chat_history_from_supabase
 from langchain.chains import ConversationalRetrievalChain
-from app.extract_texts import logger, load_hidden_documents
-from app.embeddings import store_embeddings_in_supabase
+#from app.extract_texts import logger, load_hidden_documents
+#from app.embeddings import store_embeddings_in_supabase
 
-directory = "hidden_docs"
 # Load environment variables from .env file
 load_dotenv()
-
 # Supabase credentials
 url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+CHAT_HISTORY_PATH = os.getenv("CHAT_HISTORY_PATH")
+directory = os.getenv("directory")
 
 model = None
 
@@ -48,12 +51,19 @@ if vector_store is None:
 # Create retrieval chain
 retrieval_chain = ConversationalRetrievalChain.from_llm(model, retriever=vector_store.as_retriever())
 # Initialize Flask app
+# Load chat history from Supabase (or local file if needed)
+chat_history = load_chat_history_from_local(CHAT_HISTORY_PATH)  # Load from local if exists, else from Supabase
+# You can still load from Supabase as a fallback if the local file doesn't exist
+if not chat_history:
+    chat_history =  get_chat_history_from_supabase(supabase)
+
 app = Flask(__name__)
 
 @app.route('/validate_email', methods=['POST'])
 def validate_email():
     try:
-        email = request.form['email']
+        data = request.json  # Parse JSON data
+        email = data.get('email')
         if is_valid_email(email):
             logger.info(f"Email validated: {email}")
             return jsonify({"status": "success", "message": "Email validated successfully!"})
@@ -63,6 +73,7 @@ def validate_email():
     except Exception as e:
         logger.error(f"Error in validate_email: {e}")
         return jsonify({"status": "error", "message": "An error occurred during email validation."})
+
 @app.route('/chat', methods=['POST'])
 def ask_question():
     try:
@@ -73,20 +84,9 @@ def ask_question():
         
         logger.info(f"Received question: {user_input} from {email}")
         
-        # Retrieve chat history from local cache first, then fall back to Redis if not found
-        chat_history = local_cache.get(email)
-        if chat_history is None:
-            chat_history_key = f"chat_history:{email}"
-            chat_history_json = redis_client.get(chat_history_key)
-            chat_history = json.loads(chat_history_json) if chat_history_json else []
-
         # Call the process_user_input function
-        answer, tokens_count = process_user_input(supabase, retrieval_chain, email, name, user_input, vector_store, embedder, chat_history, datetime.fromisoformat(start_time))
-        
-        # Save updated chat history to local cache and Redis
-        local_cache[email] = chat_history
-        redis_client.set(f"chat_history:{email}", json.dumps(chat_history))
-                
+        answer, tokens_count = process_user_input(supabase, retrieval_chain, email, name, user_input,  chat_history, start_time=datetime.fromisoformat(start_time))
+                              
         logger.info(f"Question processed: {user_input}")
         
         # Include chat_history in the response for debugging

@@ -25,51 +25,6 @@ def create_vector_store(document_texts):
     logger.info("Vector store created successfully.")
     return vector_store
 
-'''def get_file_mod_times(directory):
-    """Get the modification times of all files in the directory."""
-    return {
-        f: os.path.getmtime(os.path.join(directory, f))
-        for f in os.listdir(directory)
-        if os.path.isfile(os.path.join(directory, f))  # Ensure it's a file, not a directory
-    }'''
-'''def load_or_build_vector_store(directory,supabase_client, embedder):
-    """Load the existing vector store if available; otherwise, build it from scratch."""
-    if os.path.exists(VECTOR_STORE_PATH):
-        logger.info("Loading existing vector store...")
-        return FAISS.load_local(VECTOR_STORE_PATH, embedder, allow_dangerous_deserialization=True)
-    else:
-        logger.info("Building new vector store...")
-        document_texts = load_hidden_documents(directory)
-        if not document_texts:
-            logger.warning("No documents found in the directory. Vector store not created.")
-            return None
-        logger.info(f"Document texts extracted for vector store are of length {len(document_texts)}")
-        
-        vector_store = create_vector_store(document_texts)
-        vector_store.save_local(VECTOR_STORE_PATH)
-        return vector_store'''
-
-
-'''
-def reload_vector_store_if_needed(directory, supabase_client):
-    """Reload the vector store if any files in the directory have been modified."""
-    with store_lock:  # Ensure thread safety
-        current_mod_times = get_file_mod_times(directory)
-
-        if in_memory_store["file_mod_times"] != current_mod_times:
-            in_memory_store["file_mod_times"] = current_mod_times
-            vector_store = load_or_build_vector_store(directory, supabase_client, embedder)
-            in_memory_store["vector_store"] = vector_store
-            logger.info("Vector store reloaded and stored in memory.")
-        else:
-            vector_store = in_memory_store.get("vector_store", None)
-            if vector_store:
-                logger.info("Vector store loaded from memory.")
-            else:
-                logger.error("Vector store not found in memory.")
-
-    return vector_store'''
-
 def load_or_build_vector_store(directory, supabase_client):
     """Load the existing vector store if available, otherwise build a new one."""
     new_or_modified_files = store_file_hashes_in_supabase(directory, supabase_client)

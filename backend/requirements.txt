@@ -8,6 +8,7 @@ python-docx
 PyYAML
 python-pptx
 langchain
+langchain_core
 langchain_groq
 langchain_community
 redis
@@ -16,4 +17,5 @@ scikit-learn
 sentence-transformers
 langchain-huggingface
 tiktoken
-zipfile
+pytz
+uuid
