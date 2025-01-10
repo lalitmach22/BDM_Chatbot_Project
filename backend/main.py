@@ -36,9 +36,9 @@ model = load_model()
 
 supabase: Client = create_client(url, key)
 
-clean_texts = load_hidden_documents(directory)
-store_embeddings_in_supabase(supabase, clean_texts, embedder)
-logger.info(f"Embeddings stored in supabase")
+#clean_texts = load_hidden_documents(directory)
+#store_embeddings_in_supabase(supabase, clean_texts, embedder)
+#logger.info(f"Embeddings stored in supabase")
 
 # Reload vector store if needed
 vector_store = reload_vector_store_if_needed(directory, supabase)
