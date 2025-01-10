@@ -16,7 +16,7 @@ from langchain.chains import ConversationalRetrievalChain
 
 # Load environment variables from .env file
 load_dotenv()
-# Supabase credentials
+# credentials
 url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
