@@ -16,15 +16,11 @@ def store_file_hashes_in_supabase(directory, supabase_client):
     for filename in os.listdir(directory):
         filepath = os.path.join(directory, filename)
         if not os.path.isfile(filepath):
-            continue  # Skip directories
+            continue  
 
         file_hash = generate_file_hash(filepath)
-
-        # Check if file hash already exists in Supabase
         if filename not in existing_hashes or existing_hashes[filename] != file_hash:
             new_or_modified_files.append((filename, file_hash))
-    
-    # Store new or modified file hashes in Supabase
     for filename, file_hash in new_or_modified_files:
         data = {"filename": filename, "hash": file_hash}
         response = supabase_client.table("file_hashes").upsert(data).execute()

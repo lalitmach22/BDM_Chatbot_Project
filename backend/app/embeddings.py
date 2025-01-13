@@ -9,16 +9,11 @@ def store_embeddings_in_supabase(supabase_client, cleaned_texts, embedder):
     """Generate embeddings for cleaned text and store them in Supabase."""
     
     for text in cleaned_texts:
-        # Generate hash for the text
         text_hash = generate_hash(text)
-
-        # Check if embedding with the same hash already exists
         response = supabase_client.table("embeddings").select("*").eq("hash", text_hash).execute()
         if response.data:
             logger.info(f"Embedding already exists for text: {text[:30]}...")
             continue
-
-        # Generate embedding if it doesn't exist
         embedding = embedder.embed_documents([text])[0]
         data = {
             "text": text,

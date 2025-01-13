@@ -24,7 +24,6 @@ vector_store_1 = FAISS(
     docstore=InMemoryDocstore(),
     index_to_docstore_id={},
 )
-# Email validation regex
 email_regex = re.compile(r"^\d{2}f\d{7}@ds\.study\.iitm\.ac\.in$")
 
 def is_valid_email(email):
@@ -62,8 +61,6 @@ def get_chat_history_from_supabase(supabase):
     """Retrieve all chat history from Supabase and return as a list of (question, answer) tuples."""
     try:
         response = supabase.table("chat_sessions_2").select("question, answer").execute()
-        
-        # Check if response contains data and is a list
         if response.data and isinstance(response.data, list):
             chat_history = [(entry["question"], entry["answer"]) for entry in response.data]
             logger.info(f"Retrieved {len(chat_history)} chat history entries from Supabase.")
@@ -107,11 +104,7 @@ def find_similar_question_faiss(user_input, vector_store_1, embeddings, k = 4,
                                 fetch_k = 5, lambda_mult = 0.5, filter = None,  
                                 similarity_threshold = 0.9):
     """Find similar questions using FAISS-based vector search with maximal marginal relevance and score filtering."""
-    
-    # Embed the user input to get the vector representation
     user_input_embedding = embeddings.embed_query(user_input)
-    
-    # Use max_marginal_relevance_search_with_score_by_vector to fetch the most relevant and diverse results
     results_with_scores = vector_store_1.max_marginal_relevance_search_with_score_by_vector(
         embedding=user_input_embedding,
         k=k,
@@ -119,8 +112,6 @@ def find_similar_question_faiss(user_input, vector_store_1, embeddings, k = 4,
         lambda_mult=lambda_mult,
         filter=filter
     )
-    
-    # Filter results based on the similarity score threshold
     filtered_results = [
         (result[0].page_content.split("Answer:")[1].strip(), result[1])
         for result in results_with_scores
@@ -129,9 +120,7 @@ def find_similar_question_faiss(user_input, vector_store_1, embeddings, k = 4,
     
     if filtered_results:
         logger.info(f"Found {len(filtered_results)} similar questions with similarity score >= {similarity_threshold}.")
-        
-        # Return the best match (the answer from the first filtered result)
-        best_match = filtered_results  # Extract answer from the first result
+        best_match = filtered_results  
         logger.info(f"Found best similar answer with similarity score: {best_match}")
         return best_match
     else:
@@ -140,16 +129,12 @@ def find_similar_question_faiss(user_input, vector_store_1, embeddings, k = 4,
 
 def process_user_input(supabase, retrieval_chain, email, name, user_input, chat_history, start_time=None):
     """Process the user's input and return the chatbot's response."""
-    logger.info(f"Processing user input: {user_input} and type of user input is {type(user_input)}")    
-    #logger.info(f"chat history passed is{chat_history} with size of {len(chat_history)} and its type is {type(chat_history)}")
-    
+    logger.info(f"Processing user input: {user_input} and type of user input is {type(user_input)}")      
     if start_time is None:
         start_time = datetime.now()
 
     current_time = datetime.now()
     elapsed_time = current_time - start_time  
-
-    # Convert chat_history (list of tuples) into a list of Document objects
     documents = [
         Document(
             page_content=f"Question: {question}\nAnswer: {answer}",
@@ -157,13 +142,9 @@ def process_user_input(supabase, retrieval_chain, email, name, user_input, chat_
         )
         for question, answer in chat_history
     ]
-    
-    # Print the created documents for debugging
     logger.info(f"Created  documents type is{type(documents)}")
       
     uuids = [str(uuid4()) for _ in range(len(documents))]
-
-    # Add documents to the vector store
     try:
         vector_store_1.add_documents(documents=documents, ids=uuids)
         logger.info(f"Documents added to vector store. and lenght of documents added is {len(documents)}")
@@ -171,8 +152,6 @@ def process_user_input(supabase, retrieval_chain, email, name, user_input, chat_
     except Exception as e:
         logger.error(f"Error adding documents to vector store: {e}")
         return "An error occurred while processing your input.", 0
-    
-    # Check for similar questions using FAISS
     results = find_similar_question_faiss(user_input, vector_store_1, embeddings, k = 1, 
                                 fetch_k = 5, lambda_mult = 0.5, filter = None,  
                                 similarity_threshold = 0.95)
@@ -181,16 +160,12 @@ def process_user_input(supabase, retrieval_chain, email, name, user_input, chat_
     
     if results and len(chat_history )> 50:
         logger.info(f"Found answer to similar question: {results}")
-        # Return similar answer with 0 token count (no API call)
         return results, 0
-    # Delete all the documents that were added (if you need to remove all)
-    vector_store_1.delete(ids=uuids)  # Remove all documents that were added
+    vector_store_1.delete(ids=uuids)  
     try:
         limited_chat_history = get_limited_chat_history(chat_history, limit=5)
 
         limited_chat_history_tuples = [tuple(pair) for pair in limited_chat_history]
-        # Flatten chat history (list of tuples) into a single list of alternating questions and answers
-        #flattened_chat_history = [item for sublist in limited_chat_history for item in sublist]
         tokens_count = count_tokens_in_chat_history(limited_chat_history_tuples)
         response = retrieval_chain.invoke({"question": user_input, "chat_history": limited_chat_history_tuples})
         
@@ -204,21 +179,13 @@ def process_user_input(supabase, retrieval_chain, email, name, user_input, chat_
 
         if not user_input.lower() == "stop" or elapsed_time > timedelta(minutes=30):
             return answer , tokens_count
-                        
-        # If the user types "stop" or the session has timed out, save the session
         if user_input.lower() == "stop" or elapsed_time > timedelta(minutes=30):
             save_session_to_supabase(supabase, email, name, chat_history)
             logger.info("Session data successfully saved to Supabase.")
-    
-            # Send feedback message to the user
             end_message = "Session data successfully saved. Please refresh to start a new session."
-    
-            # Clear chat history after providing feedback
             chat_history.clear()
             logger.info("Chat history cleared after session end.")
-    
-            return end_message, tokens_count
-        
+            return end_message, tokens_count  
     except Exception as e:
         logger.error(f"Exception occurred while processing user input: {e}")
         return "An error occurred while processing your input. Please try again.", 0
