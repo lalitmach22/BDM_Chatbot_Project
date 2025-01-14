@@ -27,6 +27,7 @@ def create_vector_store(document_texts):
 
 def load_or_build_vector_store(directory, supabase_client):
     """Load the existing vector store if available, otherwise build a new one."""
+    # Check for new or modified files
     new_or_modified_files = store_file_hashes_in_supabase(directory, supabase_client)
     logger.info(f"Found {len(new_or_modified_files)} new or modified files.")
 
@@ -37,36 +38,34 @@ def load_or_build_vector_store(directory, supabase_client):
     else:
         vector_store = None
 
-    if not new_or_modified_files:
-        if vector_store:
-            logger.info("No new or modified files. Using existing vector store.")
-            return vector_store
-        else:
-            logger.warning("No vector store found and no new documents to process.")
-            return None
+    # Case 1: New or modified files exist and vector store exists
+    if new_or_modified_files and vector_store:
+        logger.info("Building vector store for new files and merging with existing store...")
+        document_texts = load_hidden_documents(directory, files=new_or_modified_files)
+        if not document_texts:
+            logger.warning("No content found in new or modified files.")
+            return vector_store  # Return the existing vector store
+        new_vector_store = FAISS.from_texts(document_texts, embedder)
+        vector_store.merge_from(new_vector_store)
 
-    # Load texts from new or modified files
-    document_texts = load_hidden_documents(directory, files=new_or_modified_files)
-    if not document_texts:
-        logger.warning("No documents found in the directory. Vector store not created.")
+    # Case 2: No new files, but an existing vector store exists
+    elif not new_or_modified_files and vector_store:
+        logger.info("No new files. Using existing vector store.")
         return vector_store
 
-    # If vector store doesn't exist, create it from the new document texts
-    if vector_store is None:
+    # Case 3: New files exist and no vector store, OR no new files and no vector store
+    elif (new_or_modified_files and not vector_store) or (not new_or_modified_files and not vector_store):
+        logger.info("Building new vector store from all documents.")
+        document_texts = load_hidden_documents(directory)
+        if not document_texts:
+            logger.warning("No documents found in the directory to build a vector store.")
+            return None
         vector_store = create_vector_store(document_texts)
-    else:
-        # Create a new vector store for the new documents
-        new_vector_store = FAISS.from_texts(document_texts, embedder)
 
-        # Merge the new vector store with the existing one
-        vector_store.merge_from(new_vector_store)
-        logger.info("Appended new embeddings to existing vector store.")
-
-    # Save the updated vector store
+    # Save the updated or newly created vector store
     vector_store.save_local(VECTOR_STORE_PATH)
-    logger.info("Updated vector store saved.")
+    logger.info("Vector store updated and saved.")
     return vector_store
-
 
 def reload_vector_store_if_needed(directory, supabase_client):
     """Reload the vector store if any files in the directory have changed."""

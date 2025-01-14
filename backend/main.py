@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from langchain_groq import ChatGroq
 from app.extract_texts import logger
-from app.vector_store import reload_vector_store_if_needed, embedder
+from app.vector_store import load_or_build_vector_store, embedder
 from app.chat import is_valid_email, process_user_input
 from app.chat import load_chat_history_from_local
 from app.chat import get_chat_history_from_supabase
@@ -44,9 +44,9 @@ supabase: Client = create_client(url, key)
 #logger.info(f"Embeddings stored in supabase")
 
 # Reload vector store if needed
-vector_store = reload_vector_store_if_needed(directory, supabase)
+vector_store = load_or_build_vector_store(directory, supabase)
 if vector_store is None:
-    raise ValueError("Failed to initialize vector_store. Ensure hidden_docs folder and embeddings setup are correct.")
+    raise ValueError("Failed to initialize vector_store. Ensure vector store setup is correct.")
 
 # Create retrieval chain
 retrieval_chain = ConversationalRetrievalChain.from_llm(model, retriever=vector_store.as_retriever())
