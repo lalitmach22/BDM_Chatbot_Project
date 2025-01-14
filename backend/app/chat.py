@@ -129,6 +129,8 @@ def find_similar_question_faiss(user_input, vector_store_1, embeddings, k = 4,
 
 def process_user_input(supabase, retrieval_chain, email, name, user_input, chat_history, start_time=None):
     """Process the user's input and return the chatbot's response."""
+    chat_history_1 = []
+    
     logger.info(f"Processing user input: {user_input} and type of user input is {type(user_input)}")      
     if start_time is None:
         start_time = datetime.now()
@@ -160,10 +162,12 @@ def process_user_input(supabase, retrieval_chain, email, name, user_input, chat_
     
     if results and len(chat_history )> 50:
         logger.info(f"Found answer to similar question: {results}")
+        chat_history_1.append((user_input, results))
         return results, 0
     vector_store_1.delete(ids=uuids)  
     try:
-        limited_chat_history = get_limited_chat_history(chat_history, limit=5)
+        limited_chat_history = get_limited_chat_history(chat_history_1, limit=5)
+        #limited_chat_history = get_limited_chat_history(chat_history, limit=5)
 
         limited_chat_history_tuples = [tuple(pair) for pair in limited_chat_history]
         tokens_count = count_tokens_in_chat_history(limited_chat_history_tuples)
@@ -172,6 +176,7 @@ def process_user_input(supabase, retrieval_chain, email, name, user_input, chat_
         logger.info(f"Response type is {type(response)}")
         answer = response["answer"]
         chat_history.append((user_input, answer))
+        chat_history_1.append((user_input, answer))
         save_chat_history_to_local(r'D:\BDM2\backend\app\chat_history.json', chat_history)            
         logger.info(f"Chatbot response: {answer}")
         tokens_count += count_tokens(user_input)
@@ -184,6 +189,7 @@ def process_user_input(supabase, retrieval_chain, email, name, user_input, chat_
             logger.info("Session data successfully saved to Supabase.")
             end_message = "Session data successfully saved. Please refresh to start a new session."
             chat_history.clear()
+            chat_history_1.clear()
             logger.info("Chat history cleared after session end.")
             return end_message, tokens_count  
     except Exception as e:
